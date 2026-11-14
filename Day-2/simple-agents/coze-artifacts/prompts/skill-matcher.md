@@ -24,31 +24,7 @@ Candidate Resume Extract:
 {{input}}  (or insert resume text here)
 
 Target Job Description:
-Job Title: Machine Learning Engineer
-
-Role Overview: Mid-to-senior Machine Learning Engineer responsible for end-to-end model ownership, scalable pipeline engineering, model optimization, AI/NLP/GenAI applications, agentic system design, and MLOps.
-
-Required Technical Skills:
-
-Production Software Engineering (Python, maintainable/testable code)
-
-ML Frameworks (PyTorch, TensorFlow, scikit-learn, XGBoost)
-
-Data Manipulation & SQL
-
-MLOps, CI/CD, and Model Deployment (RESTful APIs, serialization)
-
-System Observability, Data Drift Detection, & Monitoring
-
-Agentic Systems & GenAI/NLP fine-tuning
-
-Qualifications & Experience:
-
-3 to 6 years of professional ML/AI engineering experience
-
-Master's degree in Computer Science, AI, or related field (preferred)
-
-System design, computer science fundamentals, and math/stats foundation
+{{jd}}
 
 Expected Output Format:
 Please provide the output using clear headings and bullet points. Show skill match percentage from resume against the job description
