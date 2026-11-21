@@ -1,0 +1,1 @@
+Prompt: Create a workflow that would accept two files as input (a word document (resume) and another text document (job description)), first extract the contents of the word document and list down skills and a weightage to it. Then compare the weighted list with the given job description and provide a detailed rubric on the fitment of the resume for the job description.
