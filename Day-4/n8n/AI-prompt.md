@@ -1,4 +1,6 @@
-Create an n8n workflow called "Resume Fitment Analyzer" that takes two uploaded files, a Word resume (.docx) and a job description (.txt), and returns a weighted-skills fitment rubric to the user in the browser.
+---
+
+Create an n8n workflow called "Resume Fitment Analyzer-beta" that takes two uploaded files, a Word resume (.docx) and a job description (.txt), and returns a weighted-skills fitment rubric to the user in the browser.
 
 TRIGGER
 - Use a Form Trigger with the path "resume-fitment-analyzer".
@@ -9,12 +11,15 @@ TRIGGER
 STEPS (linear)
 1. Code node "Read Job Description":
    - Read the "job_description" binary as UTF-8 text into json.jdText.
-   - Pass the resume binary on as binary property "data".
-   - Relabel that binary as a zip, because n8n's Compression node rejects the ".docx" extension even though a docx is a zip archive. Set fileName "resume.zip", fileExtension "zip" and mimeType "application/zip".
+   - Read the "resume" binary into a buffer with `this.helpers.getBinaryDataBuffer(0, 'resume')`. Then create a brand-new binary from that buffer with `this.helpers.prepareBinaryData(buffer, 'resume.zip', 'application/zip')`. Output it as binary property "data". Do NOT copy or spread the original resume binary object and override its fields: the Compression node still rejects it as ".docx".
+   - This relabels the docx as a zip, because n8n's Compression node rejects the ".docx" extension even though a docx is a zip archive. Also set fileName "resume.zip", fileExtension "zip" and mimeType "application/zip" on the new binary.
 2. Compression node "Unzip Resume (docx)": operation Decompress, binary property "data", output prefix "file_".
 3. Code node "Extract Resume Text":
-   - Find the unzipped binary whose fileName ends with "word/document.xml". Throw a clear error if it is not found.
+   - The Compression node stores each archive entry under its base file name only (for example `document.xml`) and puts the folder in a separate `directory` field (for example `word`). So the fileName never ends with "word/document.xml" on its own.
+   - For each unzipped binary, build the full path as `directory + '/' + fileName`, with leading slashes stripped, and find the one that ends with "word/document.xml". Also accept a fileName that already ends with "word/document.xml".
+   - If it is not found, throw a clear error that lists the entry paths that were found.
    - Convert the XML to plain text. Turn </w:p> into newlines, <w:tab/> into tabs and <w:br/> into newlines. Strip the remaining tags, decode the XML entities (&amp; &lt; &gt; &quot; &apos;) and collapse 3 or more blank lines.
+   - Write regexes so they survive Code-node string escaping. For example, use a character class like `/^[/]+/` instead of `/^\/+/`.
    - Output json.resumeText, and carry jdText forward from the "Read Job Description" node.
    - Use no external libraries or network calls.
 4. Basic LLM Chain "Extract Weighted Skills":
@@ -40,3 +45,6 @@ MODELS
 
 NOTES
 - Verification can't simulate file uploads, so test by submitting real files through the form.
+- To debug the Code nodes without re-uploading, replay a failed execution through the single node. A Code node with no network calls is safe to re-run.
+
+---
