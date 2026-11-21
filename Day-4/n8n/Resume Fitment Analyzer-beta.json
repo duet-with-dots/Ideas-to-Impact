@@ -1,0 +1,318 @@
+{
+  "name": "Resume Fitment Analyzer-beta",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Resume Fitment Analyzer",
+        "formDescription": "Upload a resume (.docx) and a job description (.txt) to get a skills-weighted fitment rubric.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Resume",
+              "fieldType": "file",
+              "fieldName": "resume",
+              "multipleFiles": false,
+              "acceptFileTypes": ".docx",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Job Description",
+              "fieldType": "file",
+              "fieldName": "job_description",
+              "multipleFiles": false,
+              "acceptFileTypes": ".txt",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Analyze",
+          "path": "resume-fitment-analyzer"
+        }
+      },
+      "id": "9ba099db-8fe3-49fc-ada0-5a049d5415fe",
+      "name": "Upload Resume and Job Description",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        112
+      ],
+      "webhookId": "eaca5e49-a784-4431-823f-3013f6b45d52"
+    },
+    {
+      "parameters": {
+        "jsCode": "const jdBuf = await this.helpers.getBinaryDataBuffer(0, 'job_description');\nconst jdText = jdBuf.toString('utf8');\nconst resumeBuf = await this.helpers.getBinaryDataBuffer(0, 'resume');\nconst data = await this.helpers.prepareBinaryData(resumeBuf, 'resume.zip', 'application/zip');\ndata.fileName = 'resume.zip';\ndata.fileExtension = 'zip';\ndata.mimeType = 'application/zip';\nreturn [{ json: { jdText }, binary: { data } }];"
+      },
+      "id": "402b9874-257f-49e7-9c0b-3abc9d630074",
+      "name": "Read Job Description",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        224
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9605d43c-6a68-450c-bf47-2cf3585b06be",
+      "name": "Unzip Resume (docx)",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst keys = Object.keys(item.binary || {});\nconst fullPath = (b) => ((b.directory ? b.directory + '/' : '') + (b.fileName || '')).replace(/^[/]+/, '');\nconst key = keys.find((k) => fullPath(item.binary[k]).endsWith('word/document.xml') || (item.binary[k].fileName || '').endsWith('word/document.xml'));\nif (!key) throw new Error('Could not find word/document.xml in the unzipped resume - is it a valid .docx file? Found entries: ' + (keys.map((k) => fullPath(item.binary[k])).join(', ') || 'none'));\nconst buf = await this.helpers.getBinaryDataBuffer(0, key);\nlet xml = buf.toString('utf8');\nxml = xml.replace(/<\\/w:p>/g, '\\n').replace(/<w:tab\\/>/g, '\\t').replace(/<w:br\\/>/g, '\\n');\nlet text = xml.replace(/<[^>]+>/g, '');\ntext = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&apos;/g, \"'\");\ntext = text.replace(/\\n{3,}/g, '\\n\\n').trim();\nreturn [{ json: { resumeText: text, jdText: $('Read Job Description').first().json.jdText } }];"
+      },
+      "id": "826f7c2a-0ace-4593-a21b-9726d2e0df52",
+      "name": "Extract Resume Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Resume text:\n\n{{ $json.resumeText }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an expert technical recruiter. From the resume text, list every distinct skill (technical, tools, domain, soft skills). Assign each a weight from 1 to 100 reflecting how strongly the resume evidences it (years of experience, recency, depth, achievements). The weights must sum to 100 across all skills. Return ONLY valid JSON in the form {\"skills\":[{\"skill\":\"\",\"category\":\"\",\"weight\":0,\"evidence\":\"\"}]}, sorted by weight descending. No markdown fences."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "4ff098ce-c7da-45b7-a4cf-dcd6fa657044",
+      "name": "Extract Weighted Skills",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        752,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-6.1-terra"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "58104c05-c698-4bac-b65b-cee07b0adc4e",
+      "name": "OpenAI Chat Model (Skills)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        832,
+        224
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=WEIGHTED RESUME SKILLS (JSON):\n{{ $json.text }}\n\nJOB DESCRIPTION:\n{{ $(\"Extract Resume Text\").first().json.jdText }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a senior hiring evaluator. Compare the weighted resume skills to the job description and produce a detailed fitment rubric as a clean HTML fragment (no markdown, no code fences, no html/head/body tags). Include: (a) an overall fit score out of 100 and a verdict (Strong Fit / Good Fit / Partial Fit / Weak Fit); (b) a rubric table with columns: Criterion, JD Weight %, Resume Evidence, Score 0-10, Weighted Score, Rationale. Criteria must cover: required technical skills, preferred skills, experience level, domain relevance, leadership and soft skills, education, and achievements; (c) matched skills; (d) gaps; (e) extra strengths; (f) risks; (g) a recommendation and interview questions. Cite evidence only from the inputs; do not invent facts absent from them."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "e88424d5-2d54-486e-a388-02ab5472602c",
+      "name": "Build Fitment Rubric",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1104,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-6.1-terra"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "66356c60-cdd2-4c7f-9ed6-a60fc2e122f7",
+      "name": "OpenAI Chat Model (Rubric)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1184,
+        336
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $json.text }}"
+      },
+      "id": "95c33e09-9e8f-4c34-b7ab-01e449bc1cbb",
+      "name": "Show Fitment Report",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1456,
+        112
+      ],
+      "webhookId": "2d23ace6-915c-4c7e-89e3-5270554a356b"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Upload Resume and Job Description": {
+      "main": [
+        [
+          {
+            "node": "Read Job Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Job Description": {
+      "main": [
+        [
+          {
+            "node": "Unzip Resume (docx)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unzip Resume (docx)": {
+      "main": [
+        [
+          {
+            "node": "Extract Resume Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Resume Text": {
+      "main": [
+        [
+          {
+            "node": "Extract Weighted Skills",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Weighted Skills": {
+      "main": [
+        [
+          {
+            "node": "Build Fitment Rubric",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model (Skills)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Weighted Skills",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Fitment Rubric": {
+      "main": [
+        [
+          {
+            "node": "Show Fitment Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model (Rubric)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Build Fitment Rubric",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "00dd02dd-9a1e-4ed0-87a6-85a9f2bed22c",
+  "meta": {
+    "instanceId": "bfd3614ee27faafdd32192e5cc9671795fee8df6e214d953a04632b6172c40d9"
+  },
+  "nodeGroups": [
+    {
+      "id": "26829ee8-fff7-463c-b6f3-4df76e703841",
+      "name": "Read resume and job description",
+      "nodeIds": [
+        "402b9874-257f-49e7-9c0b-3abc9d630074",
+        "9605d43c-6a68-450c-bf47-2cf3585b06be",
+        "826f7c2a-0ace-4593-a21b-9726d2e0df52"
+      ],
+      "description": "Takes the uploaded files and turns the docx resume and txt job description into plain text"
+    },
+    {
+      "id": "7e0caa19-d13f-4bb9-ad55-a31852f35e6c",
+      "name": "Score fitment",
+      "nodeIds": [
+        "4ff098ce-c7da-45b7-a4cf-dcd6fa657044",
+        "58104c05-c698-4bac-b65b-cee07b0adc4e",
+        "e88424d5-2d54-486e-a388-02ab5472602c",
+        "66356c60-cdd2-4c7f-9ed6-a60fc2e122f7"
+      ],
+      "description": "Weights the resume skills, then compares them to the job description to build the HTML rubric"
+    }
+  ],
+  "id": "t1zD791b5t2UEnbO",
+  "tags": []
+}
