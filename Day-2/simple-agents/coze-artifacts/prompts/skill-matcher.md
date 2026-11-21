@@ -20,11 +20,8 @@ Improvement Suggestions: Provide concise recommendations for the candidate to be
 
 User Prompt:
 
-Candidate Resume Extract:
-{{input}}  (or insert resume text here)
+Candidate Resume Extract: {{resume_text}} (or insert resume text here)
 
-Target Job Description:
-{{jd}}
+Target Job Description: 
 
-Expected Output Format:
-Please provide the output using clear headings and bullet points. Show skill match percentage from resume against the job description
+Expected Output Format: Please provide the output using clear headings and bullet points. Show skill match percentage from resume against the job description
