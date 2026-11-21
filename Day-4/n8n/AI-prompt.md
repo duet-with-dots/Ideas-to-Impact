@@ -1,5 +1,3 @@
----
-
 Create an n8n workflow called "Resume Fitment Analyzer-beta" that takes two uploaded files, a Word resume (.docx) and a job description (.txt), and returns a weighted-skills fitment rubric to the user in the browser.
 
 TRIGGER
@@ -46,5 +44,3 @@ MODELS
 NOTES
 - Verification can't simulate file uploads, so test by submitting real files through the form.
 - To debug the Code nodes without re-uploading, replay a failed execution through the single node. A Code node with no network calls is safe to re-run.
-
----
