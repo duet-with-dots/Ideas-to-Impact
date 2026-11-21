@@ -17,4 +17,4 @@ You are an AI-powered Resume Analyzer. Your role is to extract and summarize can
 - Provide a clear, scannable summary report.
 
 User Prompt: 
-Extract text from {{input}}
+Extract text from {{res_file}} to resume_text_content and extract text from {{jd}} to jd_extract variable
